@@ -102,9 +102,74 @@ def dashboard():
     else:
         return redirect('/login')
 
-
 @app.route('/order_webs', methods=['POST'])
 def order_webs():
-    if 'user_id'
+    if 'user_id' in session:
+        user_id = session['user_id']
+        quantity = request.form['web_count']
+        topic = request.form['topic']
+
+        cursor = mydb.cursor()
+
+        # Check if table exists, create it if not
+        cursor.execute(f"SHOW TABLES LIKE '{user_id}_web_orders'")
+        result = cursor.fetchone()
+        if not result:
+            cursor.execute(f"CREATE TABLE {user_id}_web_orders (id INT AUTO_INCREMENT PRIMARY KEY, web_count INT, topic VARCHAR, order_date DATE, status VARCHAR)")
+
+        # Insert new web order into table
+        cursor.execute(f"INSERT INTO {user_id}_web_orders (web_count, topic, order_date, status) VALUES (%s, %s, NOW(), 'processing')", (quantity, topic))
+        mydb.commit()
+        return redirect('/dashboard')
+    else:
+        return redirect('/login')
+
+
+
+@app.route('/cancel_order', methods=['POST'])
+def cancel_order():
+    if 'user_id' not in session:
+        # Redirect the user to the login page if they are not logged in
+        return redirect('/login')
+    
+    user_id = session['user_id']
+    order_id = request.form.get('order_id')
+    
+    if not order_id:
+        # Return an error message if the order ID is missing from the form data
+        return "Order ID is missing"
+    
+    cursor = mydb.cursor()
+    
+    try:
+        # Check if the order belongs to the user
+        cursor.execute(f"SELECT * FROM {user_id}_web_orders WHERE id=%s", (order_id,))
+        result = cursor.fetchone()
+        if not result:
+            # Return an error message if the order ID does not match any orders for the user
+            return "Invalid order ID"
+        
+        # Delete the order from the table
+        cursor.execute(f"DELETE FROM {user_id}_web_orders WHERE id=%s", (order_id,))
+        mydb.commit()
+        
+        # Redirect the user to the dashboard page after cancelling the order
+        return redirect('/dashboard')
+    except Exception as e:
+        # Return an error message if any other errors occur during the database operation
+        return f"Error cancelling order: {str(e)}"
+    finally:
+        # Close the database cursor to free up resources
+        cursor.close()
+
+
+
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
 
 
